@@ -1,13 +1,13 @@
 // ==UserScript==
 // @name           GW LazyTools
 // @namespace      noobs
-// @version        20110801a
+// @version        20110803a
 // @description    Powertools for Global Warfare
 // @include        http://*.globalwarfaregame.com/*main_src.php*
 // @include        http://apps.facebook.com/globalwarfaregame/*
 // ==/UserScript==
 
-var Version = '20110801a';
+var Version = '20110803a';
 
 // Test switches
 var DEBUG_TRACE = false;
@@ -1320,6 +1320,149 @@ Tabs.Chat = {
 
 }
 
+/************************ Gold Collector ************************/
+var CollectGold = {
+  timer : null,
+  lastCollect : {},
+      
+  init : function (){
+    var t = CollectGold;
+    for (var c=0; c<Cities.numCities; c++)
+      t.lastCollect['c'+ Cities.cities[c].id] = 0;
+	t.setEnable (Options.pbgoldenable);
+  },
+  
+  setEnable : function (tf){
+    var t = CollectGold;
+    clearTimeout (t.timer);
+    if (tf)
+      t.tick();
+  },
+
+  colCityName : null,
+  colHappy : 0,  
+  tick : function (){
+    var t = CollectGold;
+    for (var c=0; c<Cities.numCities; c++){
+      var city = Cities.cities[c];
+      var happy = Seed.citystats['city'+ city.id].pop[2];
+      var since = unixTime() - t.lastCollect['c'+city.id];
+      if (happy>=Options.pbGoldLimit && since>15*60){
+        t.lastCollect['c'+city.id] = unixTime();
+        t.colCityName = city.name;
+        t.colHappy = happy;
+        t.ajaxCollectGold (city, t.e_ajaxDone);
+        break;
+      }
+    }
+    t.timer = setTimeout (t.tick, 15000);    
+  },
+
+  e_ajaxDone : function (rslt){
+    var t = CollectGold;
+    if (rslt.ok)
+      logit ('Collected '+ rslt.gained.gold +' gold for '+ t.colCityName +' (happiness was '+ t.colHappy +')', true);
+    else
+      logit ('Error collecting gold for '+ t.colCityName +': <SPAN class=boldRed>'+ unsafeWindow.ERROR_CODE[rslt.error_code] +'</span>', true);
+  },
+  
+  ajaxCollectGold : function (city, notify){
+    var params = unsafeWindow.Object.clone(unsafeWindow.g_ajaxparams);
+    params.cid = city.id;
+	params.eventid = 1;
+    new MyAjaxRequest(unsafeWindow.g_ajaxpath + "coliseumEvent.php" + unsafeWindow.g_ajaxsuffix, {
+      method: "post",
+      parameters: params,
+      onSuccess: function (rslt) {
+        if (notify)  
+          notify (rslt);
+      },
+      onFailure: function (rslt) {
+        if (notify)  
+          notify (rslt);
+      }
+    });
+  },
+}
+/************************ Oil Collector ************************/
+var CollectOil = {
+  timer : null,
+  lastCollect : {},
+      
+  init : function (){
+    var t = CollectOil;
+    t.lastCollect['c'+ Cities.cities[1].id] = 0;
+	t.setEnable (Options.pboilenable);
+  },
+  
+  setEnable : function (tf){
+    var t = CollectOil;
+    clearTimeout (t.timer);
+    if (tf)
+      t.tick();
+  },
+
+  colCityName : null,
+  colHappy : 0,  
+  tick : function (){
+    var t = CollectOil;
+	if(!Cities.cities[1]) return;
+    var city = Cities.cities[1];
+    var since = unixTime() - t.lastCollect['c'+city.id];
+    if (since>24*60*60){
+        t.lastCollect['c'+city.id] = unixTime();
+        t.colCityName = city.name;
+        t.ajaxCollectOil (city, t.e_ajaxDone);
+    }
+    t.timer = setTimeout (t.tick, 1*60*60*1000);    
+  },
+
+  e_ajaxDone : function (rslt){
+    var t = CollectOil;
+    if (rslt.ok)
+      logit ('Collected '+ rslt.gained.resource2 +' oil for '+ t.colCityName, true);
+    else
+      logit ('Error collecting oil for '+ t.colCityName +': <SPAN class=boldRed>'+ unsafeWindow.ERROR_CODE[rslt.error_code] +'</span>', true);
+  },
+  
+  ajaxCollectOil : function (city, notify){
+    var params = unsafeWindow.Object.clone(unsafeWindow.g_ajaxparams);
+    params.cid = city.id;
+	params.eventid = 1;
+    new MyAjaxRequest(unsafeWindow.g_ajaxpath + "petroleumLabEvent.php" + unsafeWindow.g_ajaxsuffix, {
+      method: "post",
+      parameters: params,
+      onSuccess: function (rslt) {
+        if (notify)  
+          notify (rslt);
+      },
+      onFailure: function (rslt) {
+        if (notify)  
+          notify (rslt);
+      }
+    });
+  },
+}
+
+/************************ Refresh Every X minutes ************************/
+var RefreshEvery  = {
+  timer : null,
+  init : function (){
+    if (Options.pbEveryMins < 1)
+      Options.pbEveryMins = 1;
+    RefreshEvery.setEnable (Options.pbEveryEnable);
+  },
+  setEnable : function (tf){
+    var t = RefreshEvery;
+    clearTimeout (t.timer);
+    if (tf)
+      t.timer = setTimeout (t.doit, Options.pbEveryMins*60000);
+  },
+  doit : function (){
+    actionLog ('Refreshing ('+ Options.pbEveryMins +' minutes expired)');
+    reloadKOC();
+  }
+}
 /************ DEBUG WIN *************/
 var debugWin = {
   popDebug : null,
