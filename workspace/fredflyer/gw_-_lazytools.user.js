@@ -1,16 +1,16 @@
 // ==UserScript==
 // @name           GW LazyTools
 // @namespace      noobs
-// @version        20110616a
+// @version        20110801a
 // @description    Powertools for Global Warfare
 // @include        http://*.globalwarfaregame.com/*main_src.php*
 // @include        http://apps.facebook.com/globalwarfaregame/*
 // ==/UserScript==
 
-var Version = '20110616a';
+var Version = '20110801a';
 
 // Test switches
-var DEBUG_TRACE = true;
+var DEBUG_TRACE = false;
 var DEBUG_BUTTON = true;
 var ENABLE_INFO = true;
 var ENABLE_CHAT = false;
@@ -175,7 +175,7 @@ function ptStartup (){
     saveOptions ();
   }
   
-  mainPop = new CPopup ('pt', Options.ptWinPos.x, Options.ptWinPos.y, 750,800, Options.ptWinDrag,
+  mainPop = new CPopup ('pt', Options.ptWinPos.x, Options.ptWinPos.y, 400,800, Options.ptWinDrag,
       function (){
         tabManager.hideTab();
         Options.ptWinIsOpen=false;
@@ -349,8 +349,8 @@ Tabs.Overview = {
       str += _row ('Steel', rows[4]);
       str += _row ('Titanium', rows[5]);
       str += _row ('Graphene', rows[6]);
-      // str += _row ('Uranium', rows[7]);
-      // str += _row ('Diamonds', rows[8]);
+      str += _row ('Uranium', rows[7]);
+      str += _row ('Diamonds', rows[8]);
       str += '<TR><TD colspan=12><BR></td></tr>';
 	  for (r=1; r<20; r++){
         rows[r] = [];
@@ -405,12 +405,18 @@ Tabs.Overview = {
       str += '<TR><TD colspan=12><BR></td></tr>';
       
       row = [];
+      row2 = [];
+      row3 = [];
       for(i=0; i<Cities.numCities; i++) {
         var rp = getResourceProduction (Cities.cities[i].id);
         var usage = parseInt(Seed.resources["city" + Cities.cities[i].id]['rec1'][3]);
-        row[i] = rp[1] - usage;
+        row3[i] = usage;
+        row2[i] = rp[1];
+				row[i] = rp[1] - usage;
       }
      
+			str += _row ('Upkeep', row3, true);
+      str += _row ('Production', row2, true);      
       str += _row ('Food +/-', row, true);
       
       for(i=0; i<Cities.numCities; i++) {
@@ -2832,7 +2838,7 @@ String.prototype.trim = function () {
 function mouseMainTab (me){   // right-click on main button resets window location
   if (me.button == 2){
     var c = getClientCoords (document.getElementById('gor_menu_bar'));
-    mainPop.setLocation ({x: c.x +4, y: c.y+0});
+    mainPop.setLocation ({x: c.width +4, y: 0});
   }
 }
 

@@ -90,6 +90,8 @@ var Options = {
 	includeTrainingTotal	:	false,
 	overviewAllowOverflow	:	false,
 	overviewFontSize	:	12,
+	pbgoldenable	:	true,
+	pbGoldLimit	:	99,
 };
 
 var Seed = unsafeWindow.seed;
@@ -182,6 +184,8 @@ function ptStartup (){
   
   AddMainTabLink('TOOLS', eventHideShow, mouseMainTab);
   tabManager.init (mainPop.getMainDiv());
+  CollectGold.init();
+  CollectOil.init();
   
   if (Options.ptWinIsOpen && Options.ptTrackOpen){
     mainPop.show (true);
@@ -193,10 +197,43 @@ function ptStartup (){
 
 /****************************  Overview Tab ******************************/
 function getResourceProduction (cityId){
-  var ret = [];
-  for (var i = 1; i <= 6; i++) {
-    var e=Seed.resources["city"+cityId]['rec'+i];
-    ret[i] = parseInt(e[2]*unsafeWindow.Resource.getTotalBonus(i,true,cityId),10);
+  var ret = [0,0,0,0,0,0,0,0,0];
+  var now = unixTime ();
+  
+  var wilds = [0, 0, 0, 0, 0, 0, 0, 0, 0];
+  var w = Seed.wilderness["city" + cityId];
+  for (var k in w){
+    var type = parseInt(w[k].tileType);
+    if (type==10 || type==11 || type==12)
+      wilds[1] += parseInt(w[k].tileLevel);
+    else 
+      wilds[type/10] += parseInt(w[k].tileLevel);
+  }  
+  
+  knight = 0;       
+  var s = Seed.knights["city" + cityId];
+  if (s) {
+    s = s["knt" + Seed.leaders["city" + cityId].resourcefulnessKnightId];
+    if (s){
+      var knight = parseInt(s.knightLevel);
+      // if (s.resourcefulnessBoostExpireUnixtime > now)
+        // knight *= 1.25;
+    }
+  }
+  var workerFactor = 1;
+  var c = parseInt(Seed.citystats["city" + cityId]["pop"][0]);  // Current  population
+  var w = parseInt(Seed.citystats["city" + cityId]["pop"][3]);  // Labor force
+  if (w > c)
+    workerFactor = c / w;
+  
+  for (var i=1; i<5; i++){
+    var usage = Seed.resources["city" + cityId]["rec" + i];
+    var items = 0;
+    if (parseInt(Seed.bonus["bC1" + i + "00"]["bT1" + i + "01"]) > now) {
+      items = 0.25;
+    }
+    var tech = Seed.tech["tch" + i];
+    ret[i] = parseInt((usage[2] * (1 + tech/10 + knight/100 + items + wilds[i]/20) * workerFactor + 100));
   }
   return ret;  
 }
@@ -348,19 +385,20 @@ Tabs.Overview = {
 	  // for(i=0; i<20; i++)
 		// str += _row (unsafeWindow.arStrings.unitName['u'+i], rows[i]);
 	  str += _row ('SupTruck', rows[1]);
-      str += _row ('AntiTank', rows[4]);
       str += _row ('Infantry', rows[5]);
       str += _row ('Sniper', rows[6]);
+      str += _row ('AntiTank', rows[4]);
+	  str += _row ('Spc Forces', rows[18]);
       str += _row ('SAM', rows[7]);
       str += _row ('Tank', rows[8]);
-      str += _row ('Helicopter', rows[9]);
-      str += _row ('Fighter', rows[10]);
-      str += _row ('Gunship', rows[11]);
-      str += _row ('Bomber', rows[12]);
-      str += _row ('Stealth', rows[13]);
-      str += _row ('Hellfire', rows[16]);
       str += _row ('Drone', rows[17]);
-      str += _row ('Special', rows[18]);  //added 7/26 Fred
+      str += _row ('Helicopter', rows[9]);
+      str += _row ('Gunship', rows[11]);
+      str += _row ('Fighter', rows[10]);
+      str += _row ('Bomber', rows[12]);
+	  str += _row ('Cargo', rows[19]);
+      str += _row ('Hellfire', rows[16]);
+      str += _row ('Stealth', rows[13]);
       str += '<TR><TD colspan=12><BR></td></tr>';
       
       row = [];
@@ -373,7 +411,7 @@ Tabs.Overview = {
         row2[i] = rp[1];
 				row[i] = rp[1] - usage;
       }
-      
+     
 			str += _row ('Upkeep', row3, true);
       str += _row ('Production', row2, true);      
       str += _row ('Food +/-', row, true);
@@ -657,7 +695,7 @@ Tabs.build = {
 	    document.getElementById('pbbuildError').innerHTML = '';
       if (t.buildStates.running == true) {
           var now = unixTime();
-		  logit ('Seed.queue_con: (now='+ now +')\n'+ inspect (Seed.queue_con, 3));
+		  //logit ('Seed.queue_con: (now='+ now +')\n'+ inspect (Seed.queue_con, 3));
           for (var i = 0; i < Cities.cities.length; i++) {
               var cityId = Cities.cities[i].id;
               var isBusy = false;
@@ -668,7 +706,7 @@ Tabs.build = {
                 else
                   qcon.shift();   // remove expired build from queue        
               }              
-			  logit ('City #'+ (i+1) + ' : busy='+ isBusy);               
+			  //logit ('City #'+ (i+1) + ' : busy='+ isBusy);               
               if (isBusy) {
                   //TODO add info of remaining build time and queue infos
               } else {
@@ -762,8 +800,8 @@ Tabs.build = {
 							Seed.queue_con["city" + currentcityid].push([bdgid, 0, parseInt(rslt.buildingId), unsafeWindow.unixtime(), unsafeWindow.unixtime() + time, 0, time, citpos]);
 							if (params.cid == unsafeWindow.currentcityid)
 								unsafeWindow.update_bdg();
-							if (document.getElementById('pbHelpRequest').checked == true)
-								t.bot_gethelp(params.bid, currentcityid);
+							// if (document.getElementById('pbHelpRequest').checked == true)
+								// t.bot_gethelp(params.bid, currentcityid);
 							t.cancelQueueElement(0, currentcityid, time, false);
 						} else {
 							var errmsg = unsafeWindow.printLocalError(rslt.error_code || null, rslt.msg || null, rslt.feedback || null);
@@ -818,8 +856,8 @@ Tabs.build = {
 								Seed.queue_con["city" + currentcityid].push([bdgid, curlvl + 1, parseInt(rslt.buildingId), unsafeWindow.unixtime(),  unsafeWindow.unixtime() + time, 0, time, citpos]);						
 								if (params.cid == unsafeWindow.currentcityid)
 									unsafeWindow.update_bdg();
-								if (document.getElementById('pbHelpRequest').checked == true)
-									t.bot_gethelp(params.bid, currentcityid);
+								// if (document.getElementById('pbHelpRequest').checked == true)
+									// t.bot_gethelp(params.bid, currentcityid);
 								t.cancelQueueElement(0, currentcityid, time, false);
 							} else {
 								var errmsg = unsafeWindow.printLocalError(rslt.error_code || null, rslt.msg || null, rslt.feedback || null);
@@ -1206,11 +1244,18 @@ Tabs.Options = {
     try {      
       m = '<TABLE class=ptTab>\
         <TR><TD colspan=2><B>Config:</b></td></tr>\
-        <TR><TD><INPUT id=ptAllowWinMove type=checkbox /></td><TD>Enable window drag (move window by dragging top bar with mouse)</td></tr>';
-      m += '</table><BR><BR><HR>Note that if a checkbox is greyed out there has probably been a change ofGW\'s code, rendering the option inoperable.';
+        <TR><TD><INPUT id=ptAllowWinMove type=checkbox /></td><TD>Enable window drag (move window by dragging top bar with mouse)</td></tr>\
+		<TR><TD><BR> </td></tr>\
+		<TR><TD colspan=2><B>Enhancements:</b></td></tr>\
+		<TR><TD><INPUT id=ptgoldenable type=checkbox /></td><TD>Auto collect gold when happiness reaches <INPUT id=ptgoldLimit type=text size=2 maxlength=3 \>%</td></tr>\
+		<TR><TD><INPUT id=ptoilenable type=checkbox /></td><TD>Auto collect oil</td></tr>';
+      m += '</table><BR><BR><HR>Note that if a checkbox is greyed out there has probably been a change of KofC\'s code, rendering the option inoperable.';
       t.cont.innerHTML = m;
 
       t.togOpt ('ptAllowWinMove', 'ptWinDrag', mainPop.setEnableDrag);
+	  t.togOpt ('ptgoldenable', 'pbgoldenable', CollectGold.setEnable);
+	  t.togOpt ('ptoilenable', 'pboilenable', CollectOil.setEnable);
+      t.changeOpt ('ptgoldLimit', 'pbGoldLimit');
 
     } catch (e) {
       t.cont.innerHTML = '<PRE>'+ e.name +' : '+ e.message +'</pre>';  
@@ -1224,27 +1269,30 @@ Tabs.Options = {
   show : function (){
   },
   
-  togOpt : function (checkboxId, optionName, callEnable, callIsAvailable){
+ togOpt : function (checkboxId, optionName, callOnChange){
     var t = Tabs.Options;
     var checkbox = document.getElementById(checkboxId);
-    
-    if (callIsAvailable && callIsAvailable()==false){
-      checkbox.disabled = true;
-      return;
-    }
     if (Options[optionName])
       checkbox.checked = true;
-    checkbox.addEventListener ('change', new eventToggle(checkboxId, optionName, callEnable).handler, false);
-    function eventToggle (checkboxId, optionName, callOnChange){
-      this.handler = handler;
-      var optName = optionName;
-      var callback = callOnChange;
-      function handler(event){
-        Options[optionName] = this.checked;
-        saveOptions();
-        if (callback != null)
-          callback (this.checked);
-      }
+    checkbox.addEventListener ('change', eventHandler, false);
+    function eventHandler (){
+      Options[optionName] = this.checked;
+      saveOptions();
+      if (callOnChange)
+        callOnChange (this.checked);
+    }
+  },
+  
+  changeOpt : function (valueId, optionName, callOnChange){
+    var t = Tabs.Options;
+    var e = document.getElementById(valueId);
+    e.value = Options[optionName];
+    e.addEventListener ('change', eventHandler, false);
+    function eventHandler (){
+      Options[optionName] = this.value;
+      saveOptions();
+      if (callOnChange)
+        callOnChange (this.value);
     }
   },
 }
@@ -1974,6 +2022,98 @@ function searchDOM (node, condition, maxLevel, doMult){
     }
 }
 
+function CdispCityPicker (id, span, dispName, notify, selbut){
+  function CcityButHandler (t){
+    var that = t;
+    this.clickedCityBut = clickedCityBut;
+    function clickedCityBut (e){
+      if (that.selected != null)
+        that.selected.className = "ptcastleBut ptcastleButNon";
+      that.city = Cities.cities[e.target.id.substr(that.prefixLen)];
+      if (that.dispName)
+        document.getElementById(that.id+'cname').innerHTML = that.city.name;
+      e.target.className = "ptcastleBut ptcastleButSel";
+      that.selected = e.target;
+      if (that.coordBoxX){
+        that.coordBoxX.value = that.city.x;
+        that.coordBoxY.value = that.city.y;
+        that.coordBoxX.style.backgroundColor = '#ffffff';
+        that.coordBoxY.style.backgroundColor = '#ffffff';
+      }
+      if (that.notify != null)
+        that.notify(that.city, that.city.x, that.city.y);
+    }
+  }
+
+  function selectBut (idx){
+    document.getElementById(this.id+'_'+idx).click();
+  }
+
+  function bindToXYboxes (eX, eY){
+    function CboxHandler (t){
+      var that = t;
+      this.eventChange = eventChange;
+      if (that.city){
+        eX.value = that.city.x;
+        eY.value = that.city.y;
+      }
+      function eventChange (){
+			var xValue=that.coordBoxX.value.trim();
+			var xI=/^\s*([0-9]+)[\s,]+([0-9]+)/.exec(xValue); 		
+			if(xI) {
+				that.coordBoxX.value=xI[1]
+				that.coordBoxY.value=xI[2]
+			}
+        var x = parseInt(that.coordBoxX.value, 10);
+        var y = parseInt(that.coordBoxY.value, 10);
+        if (isNaN(x) || x<0 || x>750){
+          that.coordBoxX.style.backgroundColor = '#ff8888';
+          return;
+        }
+        if (isNaN(y) || y<0 || y>750){
+          that.coordBoxY.style.backgroundColor = '#ff8888';
+          return;
+        }
+        that.coordBoxX.style.backgroundColor = '#ffffff';
+        that.coordBoxY.style.backgroundColor = '#ffffff';
+        if (that.notify != null)
+          that.notify (null, x, y);
+      }
+    }
+    this.coordBoxX = eX;
+    this.coordBoxY = eY;
+    var bh = new CboxHandler(this);
+    eX.size=2;
+    eX.maxLength=10;
+    eY.size=2;
+    eY.maxLength=3;
+    eX.addEventListener('change', bh.eventChange, false);
+    eY.addEventListener('change', bh.eventChange, false);
+  }
+
+  this.selectBut = selectBut;
+  this.bindToXYboxes = bindToXYboxes;
+  this.coordBoxX = null;
+  this.coordBoxY = null;
+  this.id = id;
+  this.dispName = dispName;
+  this.prefixLen = id.length+1;
+  this.notify = notify;
+  this.selected = null;
+  this.city = null;
+  var m = '';
+  for (var i=0; i<Cities.cities.length; i++)
+    m += '<INPUT class="ptcastleBut ptcastleButNon" id="'+ id +'_'+ i +'" value="'+ (i+1) +'" type=submit \>';
+  if (dispName)
+    m += ' &nbsp; <SPAN style="display:inline-block; width:85px; font-weight:bold;" id='+ id +'cname' +'></span>';
+  span.innerHTML = m;
+  var handler = new CcityButHandler(this);
+  for (var i=0; i<Cities.cities.length; i++)
+    document.getElementById (id+'_'+i).addEventListener('click', handler.clickedCityBut, false);
+  if (selbut != null)
+    this.selectBut(selbut);
+};
+
 function implodeUrlArgs (obj){
   var a = [];
   for (var k in obj)
@@ -2103,6 +2243,64 @@ if (DEBUG_TRACE) logit (" 0 myAjaxRequest: "+ url +"\n" + inspect (o, 2, 1));
     }
   }
 }
+
+function coordLink (x, y){
+  var m = [];
+  m.push ('(<a onclick="ptGotoMapHide (');
+  m.push (x);
+  m.push (',');
+  m.push (y);
+  m.push ('); return false">');
+  m.push (x);
+  m.push (',');
+  m.push (y);
+  m.push ('</a>)');  
+  return m.join('');
+}
+
+
+unsafeWindow.ptGotoMapHide = function (x, y){
+  try {
+    unsafeWindow.Modal.hideModal();
+  } catch (e){ }
+  try {
+    Modal.hideModal();
+  } catch (e){ }
+  unsafeWindow.ptGotoMap (x, y);  
+}
+
+
+
+unsafeWindow.ptGotoMap = function (x, y){
+  if (Options.hideOnGoto)
+    hideMe ();
+  setTimeout (function (){ 
+    document.getElementById('mapXCoor').value = x;
+    document.getElementById('mapYCoor').value = y;
+    unsafeWindow.reCenterMapWithCoor();
+    var a = document.getElementById("mod_views").getElementsByTagName("a");
+    for (var b = 0; b < a.length; b++) {
+        a[b].className = ""
+    }
+    document.getElementById('mod_views_map').className = "sel";
+    document.getElementById("maparea_city").style.display = 'none';
+    document.getElementById("maparea_fields").style.display = 'none';
+    document.getElementById("maparea_map").style.display = 'block';
+    unsafeWindow.tutorialClear()
+  }, 0);
+};
+
+unsafeWindow.PTscout = function (x, y){
+  setTimeout (function (){ 
+    if (Options.hideOnGoto)
+    hideMe ();
+    document.getElementById('mapXCoor').value = x;
+    document.getElementById('mapYCoor').value = y;
+    unsafeWindow.reCenterMapWithCoor();
+    unsafeWindow.changeview_map(document.getElementById('mod_views_map'));
+	unsafeWindow.modal_attack(3,x,y);
+  }, 0);
+};
 
 // returns: 'neutral', 'friendly', or 'hostile'
 function getDiplomacy (aid) {
