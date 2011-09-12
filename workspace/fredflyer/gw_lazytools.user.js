@@ -418,11 +418,11 @@ Tabs.Overview = {
       rownum = 0;
 	  // for(i=0; i<20; i++)
 		// str += _row (unsafeWindow.arStrings.unitName['u'+i], rows[i]);
-	  str += _row ('SupTruck', rows[1]);
+	    str += _row ('SupTruck', rows[1]);
       str += _row ('Infantry', rows[5]);
       str += _row ('Sniper', rows[6]);
       str += _row ('AntiTank', rows[4]);
-	  str += _row ('Spc Forces', rows[18]);
+	    str += _row ('Spc Forces', rows[18]);
       str += _row ('SAM', rows[7]);
       str += _row ('Tank', rows[8]);
       str += _row ('Drone', rows[17]);
@@ -430,9 +430,10 @@ Tabs.Overview = {
       str += _row ('Gunship', rows[11]);
       str += _row ('Fighter', rows[10]);
       str += _row ('Bomber', rows[12]);
-	  str += _row ('Cargo', rows[19]);
+	    str += _row ('Cargo', rows[19]);
       str += _row ('Hellfire', rows[16]);
       str += _row ('Stealth', rows[13]);
+      str += _row ('Nuke', rows[15]);
       str += '<TR><TD colspan=12><BR></td></tr>';
       
       row = [];
